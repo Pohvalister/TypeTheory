@@ -36,7 +36,7 @@ let free_to_subst rePl lam var =
 																																			else 0)
 		| Abs(var1, lam) -> let tmp = is_free(lam) in if (var1=var || tmp=0) then 0 else if (tmp = -1 ||(tmp=1 && StringSet.mem var1 rePl_vars)) then -1 else 1
 	in
-	(is_free lam) <> -1
+	(is_free lam) == 1(* free_to_subst x \\x.x y ==false ????*)
 ;;
 (*let free_to_subst th lam x = 
 	let rec get_free_vars l fixed free = 
@@ -99,4 +99,31 @@ let is_normal_form lam =
 
 ;;
 
+let normal_beta_reduction lam =
+	let answer = ref lam in
 
+	(*searches recursive for first place to insert - returns true when found; !answer - changed value*)
+	let rec search lam = 
+		let rec insert lam place rePl = 
+			match lam with
+			Var var -> if (place = var)	then rePl
+										else lam
+			| Abs(var, lam1) -> if (place = var)	then lam1
+													else Abs(var,(insert lam1 place rePl))
+			| App(lam1, lam2) -> App ((insert lam1 place rePl), (insert lam2 place rePl))
+		in
+
+		match lam with
+		Var var -> false
+		| App(Abs(var,lam1), lam2) -> if (free_to_subst lam2 lam1 var)	then (answer:= (insert lam1 var lam2); true)
+																		else if (search (Abs(var, lam1)))	then (answer:= App(!answer, lam2);true)
+																											else if (search lam2)	then (answer:=App(Abs(var,lam1),!answer);true)
+																																	else false
+		| App(lam1, lam2) -> if (search lam1)	then (answer:=App(!answer,lam2);true)
+												else if (search lam2)	then (answer:=App(lam1,!answer);true)
+																		else false
+		| Abs(var,lam) -> if (search lam)	then (answer:=Abs(var,!answer);true)
+											else false
+	in
+	if (search lam) then !answer else lam
+;;
