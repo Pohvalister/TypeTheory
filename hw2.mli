@@ -20,4 +20,4 @@ val normal_beta_reduction: lambda -> lambda
 (* Свести выражение к нормальной форме с использованием нормального
    порядка редукции; реализация должна быть эффективной: использовать 
    мемоизацию *)
-(*val reduce_to_normal_form: lambda -> lambda*)
+val reduce_to_normal_form: lambda -> lambda

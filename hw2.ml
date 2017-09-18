@@ -1,5 +1,7 @@
 open Hw1;;
 
+type lambda = Hw1.lambda;;
+
 module StringMap = Map.Make (
 struct
 	type t = string
@@ -12,7 +14,6 @@ struct
 	let compare = String.compare
 end);;
 
-type lambda = Hw1.lambda;;
 
 let free_vars lam =
 	let rec free_vars_rec lam = 
@@ -36,7 +37,7 @@ let free_to_subst rePl lam var =
 																																			else 0)
 		| Abs(var1, lam) -> let tmp = is_free(lam) in if (var1=var || tmp=0) then 0 else if (tmp = -1 ||(tmp=1 && StringSet.mem var1 rePl_vars)) then -1 else 1
 	in
-	(is_free lam) == 1(* free_to_subst x \\x.x y ==false ????*)
+	(is_free lam) <> -1(* free_to_subst x \\x.x y ==false ????*)
 ;;
 (*let free_to_subst th lam x = 
 	let rec get_free_vars l fixed free = 
@@ -126,4 +127,66 @@ let normal_beta_reduction lam =
 											else false
 	in
 	if (search lam) then !answer else lam
+;;
+
+
+type lambda_shared = Var_Sh of string | Abs_Sh of string * lambda_shared ref | App_Sh of lambda_shared ref * lambda_shared ref;;
+
+let reduce_to_normal_form lam1 =
+	(* converting to memomised lam and to usual*)
+	let rec convert_to_sh lam = 
+		match lam with
+		Var var -> ref (Var_Sh var)
+		| Abs(var,lam) -> ref (Abs_Sh(var, (convert_to_sh lam)))
+		| App(lam1,lam2) -> ref (App_Sh((convert_to_sh lam1), (convert_to_sh lam2)))
+	in
+
+	let rec convert_to_norm lamSh = 
+		match !lamSh with
+		Var_Sh varSh -> Var varSh
+		|Abs_Sh(varSh,lamSh) -> Abs (varSh, convert_to_norm lamSh)
+		|App_Sh(lamSh1,lamSh2) -> App (convert_to_norm lamSh1, convert_to_norm lamSh2)
+	in
+	(*\converting to memomised lam and to usual*)
+
+	let rec reduce_in_shared_form lamSh =
+
+		let free_to_subst_in_shared rePl lamSh var=
+			free_to_subst (convert_to_norm rePl) (convert_to_norm lamSh) var
+		in
+
+		let rec insert_shared lamSh placeSh replSh = 
+			match !lamSh with
+			Var_Sh varSh -> if (placeSh = varSh) then lamSh:=!replSh
+			|Abs_Sh(varSh,lamSh) -> if (not (placeSh = varSh)) then (insert_shared lamSh placeSh replSh)
+			|App_Sh(lamSh1,lamSh2) -> (insert_shared lamSh1 placeSh replSh); (insert_shared lamSh2 placeSh replSh)
+		in
+
+		let rec copy_shared lamSh = 
+			match !lamSh with
+			Var_Sh var -> ref (Var_Sh var)
+			| Abs_Sh(varSh,lamSh) -> ref (Abs_Sh(varSh, (copy_shared lamSh)))
+			| App_Sh(lamSh1,lamSh2) -> ref (App_Sh(copy_shared lamSh1, copy_shared lamSh2))
+		in
+
+		(*cycling will reduce lam from current, when true - cycling is ended, false - maybe require cycling one more time*)
+		let rec cycling lamSh =
+			match !lamSh with
+			Var_Sh varSh -> true
+			| Abs_Sh(varSh,lamSh) -> cycling lamSh
+			| App_Sh(lamSh3,lamSh2) ->	(match !lamSh3 with
+										 Abs_Sh(varSh, lamSh1) -> if (free_to_subst_in_shared lamSh2 lamSh1 varSh) then (lamSh:= !(copy_shared lamSh1); insert_shared lamSh varSh lamSh2;false)
+																													else if (not (cycling lamSh3))	then (cycling lamSh)
+																																					else if (not (cycling lamSh2))	then (cycling lamSh)
+																																													else true 
+										| _ -> if (not (cycling lamSh3))	then (cycling lamSh)
+																			else if (not (cycling lamSh2))	then (cycling lamSh)
+																											else true  
+										)
+		in
+		if (cycling lamSh)	then lamSh
+							else (reduce_in_shared_form lamSh) (*run new cycling*)
+	in
+
+	convert_to_norm (reduce_in_shared_form (convert_to_sh lam1))
 ;;

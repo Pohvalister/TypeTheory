@@ -82,42 +82,40 @@ Var x -> x
 let lambda_of_string str = 
 	let str = str ^ ";" in 
 	let pos = ref 0 in
-	let get () = str.[!pos] in
 	let next () = if !pos < String.length str - 1 then pos := !pos +1 in
-	let eat x = if get () = x then next () else failwith ("Unexpected symbols" ^ (String.make 1 (get())) ^ string_of_int(!pos)) in
+	let rec whiteSpace ()= if ((str.[!pos] = ' ') && (!pos < String.length str - 1)) then (next (); whiteSpace()) in
+	let get () = whiteSpace(); str.[!pos] in
+	let get_with_WP () = str.[!pos] in
+	let eat x = if get_with_WP () = x then next () else failwith ("Unexpected symbols" ^ (String.make 1 (get_with_WP())) ^ string_of_int(!pos)) in
 	let rec string_eater tmpStr = 
-		if (get ()) <>';' && (get ()) <> ')' && (get ()) <> ' ' && (get ())<> '\\' && (get ()) <> '(' && (get ())<> '.' then (
-			let current = tmpStr ^ (String.make 1 (get())) in next();
+		if (get_with_WP ()) <>';' && (get_with_WP ()) <> ')' && (get_with_WP ()) <> ' ' && (get_with_WP ())<> '\\' && (get_with_WP ()) <> '(' && (get_with_WP ())<> '.' then (
+			let current = tmpStr ^ (String.make 1 (get_with_WP())) in next();
 			string_eater current
 			)
-		else ( 
-			tmpStr 
-			) in
-	let rec parse () = 
-		match (get()) with
-			'\\' -> parse_abs ()
-			|'(' -> (let tmpValue = bracket_parse () in
-					if (get()=' ') then (
-					eat ' ';
-					App(tmpValue, parse())
-					)
-					else
-					tmpValue
-				)	
-			|_ -> var_or_app_parse ()
+		else tmpStr  
+	in
+		let rec parse () = 
+			let rec parse_conditional () =
+			match (get()) with
+				'(' -> bracket_parse ()
+				| '\\' -> parse_abs ()
+				|_ -> var_parse ()
+		
+		and bracket_parse () = eat '('; let tmp = parse() in eat ')'; tmp
+		
+		and parse_abs () = eat '\\';let nameStr = string_eater "" in eat '.'; Abs(nameStr, parse())
+		
+		and var_parse () = Var(string_eater "") 
+		
+		and parse_app lam  = App(lam, parse_conditional())
+		
+		in
 
-	and bracket_parse () = eat '('; let tmp = parse() in eat ')'; tmp
-
-	and parse_abs () = eat '\\';
-			let nameStr = string_eater "" in
-			eat '.';
-			Abs(nameStr, parse())
-
-	and var_or_app_parse () = let nameStr = string_eater "" in
-				if (get() = ' ') then begin
-					eat ' ';
-					App(Var(nameStr), parse())
-					end
-				else Var(nameStr)
-	 in
-	parse ();;
+		let collector = ref (parse_conditional()) in
+		while (!pos < String.length str - 1&&(get() <> ')')) do
+			collector:=parse_app(!collector);
+		done;
+		!collector
+	in
+	parse()
+;;
