@@ -25,6 +25,7 @@ let rec system_to_string sys =
 	match sys with
 		[] -> ""
 		| (h::t) -> (equation_to_string h) ^ "\n" ^ (system_to_string t);;
+		
 
 module StringSet = Set.Make (
 struct
@@ -108,6 +109,7 @@ let check_solution solut system =
 ;;
 
 exception InvalidSystem
+exception NotCompletedSystem
 (*----System Solving---*)
 let solve_system system =
 	let answer_place = ref system in
@@ -117,7 +119,7 @@ let solve_system system =
 
 		let rec connect_lists lst1 lst2 system_ref =
 			match (lst1,lst2) with
-			| (term1::tail1, term2::tail2) -> connect_lists tail1 tail2 system_ref;system_ref:=(term1,term2)::!system_ref
+			| (term1::tail1, term2::tail2) -> connect_lists tail1 tail2 system_ref;system_ref:=((term1,term2)::!system_ref)
 			| ([], []) -> ()
 		in
 
@@ -126,16 +128,18 @@ let solve_system system =
 			(*T=T => delete same*)
 			(*T=F => lists needed to be solved*)
 			| (Fun(name1, lst1), Fun(name2,lst2)) -> if (name1 = name2 && lst1 = lst2) then false
-																																								else
-																																								(if (name1 = name2 && List.length lst1 = List.length lst2)	then (connect_lists lst1 lst2 new_system_ref; true)
-																																																																						else raise InvalidSystem
-																																								)
-			| expr -> new_system_ref:=expr::!new_system_ref;false
+																						else
+																						(if (name1 = name2 && List.length lst1 = List.length lst2)	then (connect_lists lst1 lst2 new_system_ref; true)
+																																					else raise InvalidSystem
+																						)
+			| expr -> new_system_ref:=(expr::!new_system_ref);false
 		in
+
+		(*print_string ("uf1-----\n");print_string (system_to_string old_system);print_string ("uf2-----\n");print_string (system_to_string !new_system_ref);*)
 
 		match old_system with
 		[] -> new_system_ref:=[];false
-		| equ::tail -> (unfold_funcs tail new_system_ref) || (try_unfold equ)
+		| equ::tail -> let tmp = (unfold_funcs tail new_system_ref) in (try_unfold equ) || tmp
 	in
 
 	(*T=x, T is not var => x=T*)
@@ -143,10 +147,10 @@ let solve_system system =
 		match old_system with
 		[] -> new_system_ref := []
 		| equ::tail ->	reverse_final_equ tail new_system_ref;(
-																													match equ with
-																													| (Fun(name, lst),Var var) -> new_system_ref := (Var var,Fun(name,lst))::(!new_system_ref)
-																													| expr -> new_system_ref := expr::!new_system_ref
-																													)
+																match equ with
+																| (Fun(name, lst),Var var) -> new_system_ref := (Var var,Fun(name,lst))::(!new_system_ref)
+																| expr -> new_system_ref := expr::!new_system_ref
+																)
 	in
 
 	(*Unfolding functions in diff equalities
@@ -172,66 +176,68 @@ let solve_system system =
 
 						let (subst_answ1,subst_answ2)  = (try_to_subst var term left_term, try_to_subst var term right_term) in
 
-						if ((fst subst_answ1) || (fst subst_answ2)) then (to_system_ref:=((snd subst_answ1), (snd subst_answ2))::!to_system_ref; true)
-																	else (to_system_ref:=((snd subst_answ1), (snd subst_answ2))::!to_system_ref; false)
+						if ((fst subst_answ1) || (fst subst_answ2)) then (to_system_ref:=(((snd subst_answ1), (snd subst_answ2))::!to_system_ref); true)
+																	else (to_system_ref:=(((snd subst_answ1), (snd subst_answ2))::!to_system_ref); false)
 					in
 
-					let is_var term =
+					let is_equ_var var term =
 						match term with
-						Var var -> true
+						Var var1 -> var = var1
 						|_ -> false
 					in
-
 					match from_system with
-					[] -> false
-					| (left_term,right_term)::tail ->	(if ((is_var left_term) && (fst (try_to_subst var term right_term)))	then raise InvalidSystem
-																														else (insert var term left_term right_term) && (insert_var var term tail to_system_ref)
+					[] -> to_system_ref:= [];false
+					| (left_term,right_term)::tail ->	(if ((is_equ_var var left_term) && (fst (try_to_subst var term right_term)))	then raise InvalidSystem
+														 else (if (is_equ_var var left_term && right_term = term) then (let answ = insert_var var term tail to_system_ref in to_system_ref:=((left_term,right_term)::!to_system_ref);answ)(*если та же строка*)
+														 														else (insert_var var term tail to_system_ref) || (insert var term left_term right_term)
+														 		)
 														)
 				in
 
 				match equ with
-				| (Var var, Var var1) -> false (*x=x - бесполезно*)
-				| (Var var, term) -> insert_var var term from_system to_system_ref
+				| (Var var, term) -> (	match term with 
+										| Var var1 -> if (var = var1)	then raise InvalidSystem (*можно поставить false чтобы a = a не срабатывало как ошибка*)
+																		else insert_var var term from_system to_system_ref
+										| _ -> insert_var var term from_system to_system_ref
+									)
 				| _ -> false
 			in
 
 			match cur_system with
 			| [] -> false
 			| equ::tail -> if (evolve equ whole_system evolved_system_ref)	then true
-																			else (evolved_system_ref:=[]; find_vars tail whole_system evolved_system_ref)
+																			else (find_vars tail whole_system evolved_system_ref)
 		in
+
 		(* крутится в цикле находя новые переменые и пытаясь подставить их в остальные термы*)
 		let useful_work_flag = ref (find_vars !frstSystem !frstSystem scndSystem) in
 		if (not !useful_work_flag)	then false
-										else (
-											frstSystem:= [];
-												while (find_vars !scndSystem !scndSystem frstSystem) do
-													scndSystem:= [];
-													find_vars !frstSystem !frstSystem scndSystem;
-													frstSystem:= [];
-												done;
-												new_system_ref:= !frstSystem;
-												true
-											)
+									else (	
+											while (find_vars !scndSystem !scndSystem frstSystem) do
+												find_vars !frstSystem !frstSystem scndSystem;
+											done;
+											new_system_ref:= !frstSystem;
+											true
+										)
 	in
-	(*цикл последовательных операций - 1)удалить одинаковые, 2)раскрыть равенства, 3)развернуть термы переменной влево 4)подставить все возможные Var x = term друг в друга*)
 
+	(*цикл последовательных операций - 1)удалить одинаковые, 2)раскрыть равенства, 3)развернуть термы переменной влево 4)подставить все возможные Var x = term друг в друга*)
+	try Some (
 	let useful_work_flag = ref true in
 	while !useful_work_flag do
 		while (unfold_funcs !answer_place answer_place) do
 		();
 		done;
 		reverse_final_equ !answer_place answer_place;
-		(*print_string (system_to_string !answer_place);*)
 		useful_work_flag := insert_funcs !answer_place answer_place;
 	done;
 
 	let rec get_answer ans_place =
 		match ans_place with
-		(Var var, term)::tail -> let tmp = get_answer tail in ((fst tmp),(var,term)::(snd tmp))
-		| [] -> (true,[])
-		| _ -> (false, [])
+		(Var var, term)::tail -> (var,term)::(get_answer tail)
+		| [] -> []
+		| _ -> raise NotCompletedSystem
 	in
-	let tmp = get_answer !answer_place in if ((fst tmp))then Some (snd tmp)
-																											else None
+
+	get_answer !answer_place ) with _ -> None
 ;;
