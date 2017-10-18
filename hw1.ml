@@ -1,4 +1,4 @@
-type peano = Z | S of peano;; (* òèïû íåîáõîäèìî êîïèðîâàòü â ðåàëèçàöèþ *)
+type peano = Z | S of peano;; 
 type lambda = Var of string | Abs of string * lambda | App of lambda * lambda;;
 
 let rec peano_of_int x = match x with

@@ -1,1 +1,1 @@
-ocamlc hw1.mli hw1.ml hw2.mli hw2.ml hw3_unify.mli hw3_unify.ml t.ml -o t.exe
+ocamlc hw1.mli hw1.ml hw2.mli hw2.ml hw3_unify.mli hw3_unify.ml hw3_inference.mli hw3_inference.ml t.ml -o t.exe

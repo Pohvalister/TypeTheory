@@ -1,43 +1,32 @@
 type algebraic_term = Var of string | Fun of string * (algebraic_term list)
 
-(* at -> string *)
+(*------To string Funcs------*)
 let term_to_string at =
 	let rec impl at =
 		match at with
 			Var v -> v
-			| Fun(f, args) -> f ^ "(" ^ (impl_l args) ^ ")"
-	and impl_l l =
+			| Fun(f, args) -> f ^ "(" ^ (impl_list args) ^ ")"
+	and impl_list l =
 		match l with
 			[] -> ""
-			| (h::[]) -> (impl h) (* for last arg no last space *)
-			| (h::t) -> (impl h) ^ " " ^ (impl_l t) in
+			| (h::[]) -> (impl h)
+			| (h::t) -> (impl h) ^ " " ^ (impl_list t) in
 	impl at;;
 
 
-(* eq -> string *)
 let equation_to_string eq =
 	let lhs, rhs = eq in
 	term_to_string lhs ^ " = " ^ term_to_string rhs;;
 
 
-(* sys -> string *)
 let rec system_to_string sys =
 	match sys with
 		[] -> ""
 		| (h::t) -> (equation_to_string h) ^ "\n" ^ (system_to_string t);;
-		
 
-module StringSet = Set.Make (
-struct
-	type t = string
-	let compare = String.compare
-end);;
 
-module StringMap = Map.Make (
-struct
-	type t = string
-	let compare = String.compare
-end);;
+module StringSet = Set.Make(String);;
+module StringMap = Map.Make(String);;
 
 (*produces unique name from system*)
 let gen_unique_name_in system =
@@ -109,8 +98,8 @@ let check_solution solut system =
 ;;
 
 exception InvalidSystem
-exception NotCompletedSystem
-(*----System Solving---*)
+exception InCompletedSystem
+(*------System Solving------*)
 let solve_system system =
 	let answer_place = ref system in
 
@@ -236,7 +225,7 @@ let solve_system system =
 		match ans_place with
 		(Var var, term)::tail -> (var,term)::(get_answer tail)
 		| [] -> []
-		| _ -> raise NotCompletedSystem
+		| _ -> raise InCompletedSystem
 	in
 
 	get_answer !answer_place ) with _ -> None

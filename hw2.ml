@@ -1,18 +1,7 @@
 open Hw1;;
 
-type lambda = Hw1.lambda;;
-
-module StringMap = Map.Make (
-struct
-	type t = string
-	let compare = String.compare
-end);;
-
-module StringSet = Set.Make (
-struct
-	type t = string
-	let compare = String.compare
-end);;
+module StringMap = Map.Make (String);;
+module StringSet = Set.Make (String);;
 
 
 let free_vars lam =
