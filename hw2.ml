@@ -89,8 +89,26 @@ let is_normal_form lam =
 
 ;;
 
+let rename_arguments lam =
+	let counter = ref 0 in
+	let gen_var () = 
+		counter:= !counter + 1;
+		"α" ^ string_of_int !counter
+	in 
+
+	let rec rename lam map =
+		match lam with
+		| Var var -> if (StringMap.mem var map) then (Var (StringMap.find var map)) else Var(var)
+		| Abs (var, lam) -> let tmp = gen_var() in Abs(tmp, rename lam (StringMap.add var tmp map))
+		| App (lam1, lam2) -> App(rename lam1 map, rename lam2 map)
+	in
+
+	rename lam StringMap.empty
+;;
+
 let normal_beta_reduction lam =
-	let answer = ref lam in
+	let renamedLam = rename_arguments lam in
+	let answer = ref renamedLam in
 
 	(*searches recursive for first place to insert - returns true when found; !answer - changed value*)
 	let rec search lam = 
@@ -115,7 +133,7 @@ let normal_beta_reduction lam =
 		| Abs(var,lam) -> if (search lam)	then (answer:=Abs(var,!answer);true)
 											else false
 	in
-	if (search lam) then !answer else lam
+	if (search renamedLam) then !answer else lam
 ;;
 
 
@@ -177,5 +195,5 @@ let reduce_to_normal_form lam1 =
 							else (reduce_in_shared_form lamSh) (*run new cycling*)
 	in
 
-	convert_to_norm (reduce_in_shared_form (convert_to_sh lam1))
+	convert_to_norm (reduce_in_shared_form (convert_to_sh (rename_arguments lam1)))
 ;;
