@@ -1,6 +1,7 @@
 open Hw1;;
 open Hw2;;
 open Hw3_unify;;
+open Hw3_inference;;
 
 (*peano arithm*)
 print_int (int_of_peano (S (S (Z)))); print_string "\n";;
